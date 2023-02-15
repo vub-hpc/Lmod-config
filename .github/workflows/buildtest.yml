@@ -8,7 +8,7 @@ jobs:
         image: rockylinux:8
       steps:
       - name: Checkout code
-        uses: actions/checkout@latest
+        uses: actions/checkout@v3
 
       - name: Install rpmbuild
         run: dnf -y install rpm-build
