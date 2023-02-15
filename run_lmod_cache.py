@@ -19,6 +19,7 @@ It also can check if the age of the current age and will report if it's too old.
 import glob
 import json
 import os
+import sys
 import time
 from vsc.utils import fancylogger
 from vsc.utils.run import run as run_simple
@@ -121,7 +122,18 @@ def main():
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
                                 'int', 'store', 60*4),  # cron runs every 3 hours
         'module-basedir': ('Specify the base dir for the modules', 'str', 'store', MODULES_BASEDIR),
+        'check-cache-age': ('Show age in minutes of oldest cache and exit', None, 'store_true', False),
     }
+    opts = ExtendedSimpleOption(options, run_prologue=False)
+
+    timestamp = find_oldest_cache(opts.options.module_basedir, archs=opts.options.architecture)
+    age = time.time() - timestamp
+
+    if opts.options.check_cache_age:
+        print(int(age/60.0))
+        sys.exit()
+
+    # re-initialize to run the prologue
     opts = ExtendedSimpleOption(options)
 
     try:
@@ -133,10 +145,8 @@ def main():
                 opts.critical("Lmod cache update failed")
 
         opts.log.info("Checking the Lmod cache freshness")
-        timestamp = find_oldest_cache(opts.options.module_basedir, archs=opts.options.architecture)
-
-        # give a warning when the cache is older then --freshness-threshold
-        if (time.time() - timestamp) > opts.options.freshness_threshold * 60:
+        # give a warning when the cache is older than --freshness-threshold
+        if age > opts.options.freshness_threshold * 60:
             errmsg = "Lmod cache is not fresh"
             logger.warn(errmsg)
             opts.warning(errmsg)
