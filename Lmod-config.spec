@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.0
+Version: 1.1
 Release: 1
 License: GPL
 Group: Applications/System
@@ -35,5 +35,7 @@ rm -rf %{buildroot}
 %{_datadir}/lmod/lmod/libexec/run_lmod_cache.py
 
 %changelog
+* Wed Feb 15 2023 Samuel Moors <samuel.moors@vub.be>
+- Add option in run_lmod_cache.py to show cache age
 * Tue Feb 14 2023 Ward Poelmans <ward.poelmans@vub.be>
 - First version

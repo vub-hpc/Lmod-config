@@ -11,7 +11,7 @@
 # and the Department of Economy, Science and Innovation (EWI) (http://www.ewi-vlaanderen.be/en).
 #
 """
-This script runs the Lmod cache creation script and reports to nagios/icinga the exit status.
+This script runs the Lmod cache creation script.
 It also can check if the age of the current age and will report if it's too old.
 
 @author: Ward Poelmans (Vrije Universiteit Brussel)
@@ -19,17 +19,16 @@ It also can check if the age of the current age and will report if it's too old.
 import glob
 import json
 import os
+import sys
 import time
 from vsc.utils import fancylogger
 from vsc.utils.run import run as run_simple
-from vsc.utils.script_tools import ExtendedSimpleOption
+from vsc.utils.generaloption import SimpleOption
 
 # log setup
 logger = fancylogger.getLogger(__name__)
 fancylogger.logToScreen(True)
 fancylogger.setLogLevelInfo()
-
-NAGIOS_CHECK_INTERVAL_THRESHOLD = 2 * 60 * 60  # 2 hours
 
 MODULES_BASEDIR = '/apps/brussel/CO7'
 
@@ -111,18 +110,24 @@ def get_lmod_config():
 def main():
     """
     Set the options and initiates the main run.
-    Returns the errors if any in a nagios/icinga friendly way.
     """
     options = {
-        'nagios-check-interval-threshold': NAGIOS_CHECK_INTERVAL_THRESHOLD,
         'create-cache': ('Create the Lmod cache', None, 'store_true', False),
         'architecture': ('Specify the architecture to create the cache for. Default: all architectures',
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
                                 'int', 'store', 60*4),  # cron runs every 3 hours
         'module-basedir': ('Specify the base dir for the modules', 'str', 'store', MODULES_BASEDIR),
+        'check-cache-age': ('Show age in seconds of oldest cache and exit', None, 'store_true', False),
     }
-    opts = ExtendedSimpleOption(options)
+    opts = SimpleOption(options)
+
+    timestamp = find_oldest_cache(opts.options.module_basedir, archs=opts.options.architecture)
+    age = time.time() - timestamp
+
+    if opts.options.check_cache_age:
+        print(int(age))
+        sys.exit()
 
     try:
         if opts.options.create_cache:
@@ -133,10 +138,8 @@ def main():
                 opts.critical("Lmod cache update failed")
 
         opts.log.info("Checking the Lmod cache freshness")
-        timestamp = find_oldest_cache(opts.options.module_basedir, archs=opts.options.architecture)
-
-        # give a warning when the cache is older then --freshness-threshold
-        if (time.time() - timestamp) > opts.options.freshness_threshold * 60:
+        # give a warning when the cache is older than --freshness-threshold
+        if age > opts.options.freshness_threshold * 60:
             errmsg = "Lmod cache is not fresh"
             logger.warn(errmsg)
             opts.warning(errmsg)
@@ -149,9 +152,9 @@ def main():
         opts.critical("Script failed because of uncaught exception. See logs.")
 
     if opts.options.create_cache:
-        opts.epilogue("Lmod cache updated.")
+        opts.log.info("Lmod cache updated.")
     else:
-        opts.epilogue("Lmod cache is still fresh.")
+        opts.log.info("Lmod cache is still fresh.")
 
 
 if __name__ == '__main__':
