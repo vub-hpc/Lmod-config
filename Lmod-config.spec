@@ -15,6 +15,8 @@ Source3: lang.lua
 %description
 All the files we want for Lmod tweaking.
 
+%prep
+
 %build
 
 %install
@@ -31,9 +33,6 @@ All the files we want for Lmod tweaking.
 %if 0%{?rhel} < 8
 exit 0
 %endif
-
-%clean
-rm -rf %{buildroot}
 
 %files
 %defattr(-,root,root,-)
