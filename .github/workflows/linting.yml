@@ -1,0 +1,20 @@
+name: Linters
+on: [push, pull_request]
+
+jobs:
+  linters:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install rpmlint
+        run: sudo apt-get -y install rpmlint
+
+      - name: Run rpmlint
+        run: rpmlint Lmod-config.spec
+
+      - name: Run luacheck
+        uses: lunarmodules/luacheck@v0
+        with:
+          args: -g .
