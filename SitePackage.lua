@@ -14,6 +14,7 @@ local Dbg   = require("Dbg")
 local dbg   = Dbg:dbg()
 local hook  = require("Hook")
 local FrameStk  = require("FrameStk")
+local MT    = require("MT")
 
 
 local function logmsg(logTbl)
@@ -240,7 +241,11 @@ local function visible_hook(modT)
     elseif modT.fullName:find("JupyterHub/") then
         modT.isVisible = false
     elseif module_age(modT) > 5 then
-        modT.isVisible = false
+        local mt = MT:singleton()
+        -- do not hide anything if legacy-software is loaded
+        if not mt:exists('legacy-software') then
+            modT.isVisible = false
+        end
     end
 end
 
