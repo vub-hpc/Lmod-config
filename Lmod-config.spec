@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.2
+Version: 1.3
 Release: 1
 License: GPL
 Group: Applications/System
@@ -40,6 +40,8 @@ exit 0
 %{_datadir}/lmod/lmod/libexec/run_lmod_cache.py
 
 %changelog
+* Fri Mar 17 2023 Ward Poelmans <ward.poelmans@vub.be>
+- No hiding when legacy-sofware is loaded
 * Mon Feb 20 2023 Ward Poelmans <ward.poelmans@vub.be>
 - Add special tweak for RHEL 7 building
 * Wed Feb 15 2023 Samuel Moors <samuel.moors@vub.be>
