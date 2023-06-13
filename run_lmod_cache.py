@@ -46,7 +46,7 @@ def run_cache_create(basedir, archs=None):
         modpath = os.path.join(basedir, arch, "modules")
         if not os.path.isdir(modpath):
             continue
-        logger.debug("Creating cache for %s", arch)
+        logger.info("Creating cache for %s", arch)
         modsubpathglob = os.path.join(modpath, "20[0-9][0-9][ab]", "all")
         modsubpaths = os.pathsep.join(sorted(glob.glob(modsubpathglob)))
 
@@ -90,7 +90,7 @@ def get_lmod_config():
 
     ec, out = run_simple(f"{lmod_cmd} bash --config-json")
     if ec != 0:
-        raise RuntimeError("Failed to get Lmod configuration: %s", out)
+        raise RuntimeError(f"Failed to get Lmod configuration: {out}")
 
     try:
         lmodconfig = json.loads(out)
@@ -102,7 +102,7 @@ def get_lmod_config():
         }
         logger.debug("Found Lmod config: %s", config)
     except (ValueError, KeyError, IndexError, TypeError) as err:
-        raise RuntimeError("Failed to parse the Lmod configuration: %s", err)
+        raise RuntimeError(f"Failed to parse the Lmod configuration: {err}")
 
     return config
 
@@ -116,7 +116,7 @@ def main():
         'architecture': ('Specify the architecture to create the cache for. Default: all architectures',
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
-                                'int', 'store', 60*4),  # cron runs every 3 hours
+                                'int', 'store', 60*7),  # cron runs every 6 hours
         'module-basedir': ('Specify the base dir for the modules', 'str', 'store', MODULES_BASEDIR),
         'check-cache-age': ('Show age in seconds of oldest cache and exit', None, 'store_true', False),
     }
@@ -129,32 +129,27 @@ def main():
         print(int(age))
         sys.exit()
 
+    opts.log.info("Checking the Lmod cache freshness")
+    # give a warning when the cache is older than --freshness-threshold
+    if age > opts.options.freshness_threshold * 60:
+        errmsg = "Lmod cache is not fresh"
+        logger.warn(errmsg)
+
     try:
         if opts.options.create_cache:
             opts.log.info("Updating the Lmod cache")
             exitcode, msg = run_cache_create(opts.options.module_basedir, archs=opts.options.architecture)
             if exitcode != 0:
                 logger.error("Lmod cache update failed: %s", msg)
-                opts.critical("Lmod cache update failed")
+                sys.exit(1)
 
-        opts.log.info("Checking the Lmod cache freshness")
-        # give a warning when the cache is older than --freshness-threshold
-        if age > opts.options.freshness_threshold * 60:
-            errmsg = "Lmod cache is not fresh"
-            logger.warn(errmsg)
-            opts.warning(errmsg)
-
+            opts.log.info("Lmod cache updated.")
     except RuntimeError as err:
         logger.exception("Failed to update Lmod cache: %s", err)
-        opts.critical("Failed to update Lmod cache. See logs.")
+        sys.exit(3)
     except Exception as err:  # pylint: disable=W0703
         logger.exception("critical exception caught: %s", err)
-        opts.critical("Script failed because of uncaught exception. See logs.")
-
-    if opts.options.create_cache:
-        opts.log.info("Lmod cache updated.")
-    else:
-        opts.log.info("Lmod cache is still fresh.")
+        sys.exit(4)
 
 
 if __name__ == '__main__':

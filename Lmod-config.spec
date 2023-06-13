@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.3
+Version: 1.4
 Release: 1
 License: GPL
 Group: Applications/System
@@ -20,8 +20,8 @@ All the files we want for Lmod tweaking.
 %build
 
 %install
-%{__mkdir_p} %{buildroot}%{_datadir}/lmod/lmod/libexec
-%{__install} -p %{SOURCE0} %{buildroot}%{_datadir}/lmod/lmod/libexec
+%{__mkdir_p} %{buildroot}%{_libexecdir}/lmod
+%{__install} -p %{SOURCE0} %{buildroot}%{_libexecdir}/lmod
 
 %{__mkdir_p} %{buildroot}%{_sysconfdir}/lmod
 %{__install} -pm644 %{SOURCE1} %{buildroot}%{_sysconfdir}/lmod
@@ -37,9 +37,11 @@ exit 0
 %files
 %defattr(-,root,root,-)
 %{_sysconfdir}/lmod/
-%{_datadir}/lmod/lmod/libexec/run_lmod_cache.py
+%{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Tue Jun 13 2023 Ward Poelmans <ward.poelmans@vub.be>
+- Fix bugs in cache script and move it outside Lmod dir
 * Fri Mar 17 2023 Ward Poelmans <ward.poelmans@vub.be>
 - No hiding when legacy-sofware is loaded
 * Mon Feb 20 2023 Ward Poelmans <ward.poelmans@vub.be>
