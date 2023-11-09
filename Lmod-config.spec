@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.4
+Version: 1.5
 Release: 1
 License: GPL
 Group: Applications/System
@@ -40,6 +40,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Thu Nov 09 2023 Alex Domingo <alex.domingo.toro@vub.be>
+- Hide AlphaFold modules for ColabFold
 * Tue Jun 13 2023 Ward Poelmans <ward.poelmans@vub.be>
 - Fix bugs in cache script and move it outside Lmod dir
 * Fri Mar 17 2023 Ward Poelmans <ward.poelmans@vub.be>
