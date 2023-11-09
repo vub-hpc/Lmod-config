@@ -240,6 +240,8 @@ local function visible_hook(modT)
         modT.isVisible = false
     elseif modT.fullName:find("JupyterHub/") then
         modT.isVisible = false
+    elseif modT.fullName:find("AlphaFold/.*ColabFold") then
+        modT.isVisible = false
     elseif module_age(modT) > 5 then
         local mt = MT:singleton()
         -- do not hide anything if legacy-software is loaded
