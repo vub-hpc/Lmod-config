@@ -234,6 +234,8 @@ local function visible_hook(modT)
     -- modT is a table with: fullName, sn, fn and isVisible
     -- The latter is a boolean to determine if a module is visible or not
 
+    local mt = MT:singleton()
+
     if modT.fullName:find("cluster/%.") then
         modT.isVisible = false
     elseif modT.fullName:find("EESSI/") then
@@ -242,12 +244,12 @@ local function visible_hook(modT)
         modT.isVisible = false
     elseif modT.fullName:find("AlphaFold/.*ColabFold") then
         modT.isVisible = false
-    elseif module_age(modT) > 5 then
-        local mt = MT:singleton()
-        -- do not hide anything if legacy-software is loaded
+    elseif modT.fn:find("^/apps/brussel/CO7/") then
         if not mt:exists('legacy-software') then
             modT.isVisible = false
         end
+    elseif module_age(modT) > 5 then
+        modT.isVisible = false
     end
 end
 
