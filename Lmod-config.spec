@@ -1,7 +1,7 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
 Version: 1.6
-Release: 1
+Release: 2
 License: GPL
 Group: Applications/System
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot

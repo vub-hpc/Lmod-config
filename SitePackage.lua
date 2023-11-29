@@ -244,8 +244,10 @@ local function visible_hook(modT)
         modT.isVisible = false
     elseif modT.fullName:find("AlphaFold/.*ColabFold") then
         modT.isVisible = false
-    elseif modT.fn:find("^/apps/brussel/CO7/") and not mt:exists('legacy-software') then
-        modT.isVisible = false
+    elseif modT.fn:find("^/apps/brussel/CO7/") then
+        if not mt:exists('legacy-software') then
+            modT.isVisible = false
+        end
     elseif module_age(modT) > 5 then
         modT.isVisible = false
     end
