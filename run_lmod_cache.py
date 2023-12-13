@@ -30,7 +30,7 @@ logger = fancylogger.getLogger(__name__)
 fancylogger.logToScreen(True)
 fancylogger.setLogLevelInfo()
 
-MODULES_BASEDIR = '/apps/brussel/CO7'
+MODULES_BASEDIR = '/apps/brussel/RL8'
 
 
 def run_cache_create(basedir, archs=None):
@@ -102,7 +102,7 @@ def get_lmod_config():
         }
         logger.debug("Found Lmod config: %s", config)
     except (ValueError, KeyError, IndexError, TypeError) as err:
-        raise RuntimeError(f"Failed to parse the Lmod configuration: {err}")
+        raise RuntimeError(f"Failed to parse the Lmod configuration: {err}") from err
 
     return config
 
@@ -116,7 +116,7 @@ def main():
         'architecture': ('Specify the architecture to create the cache for. Default: all architectures',
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
-                                'int', 'store', 60*7),  # cron runs every 6 hours
+                                'int', 'store', 60 * 7),  # cron runs every 6 hours
         'module-basedir': ('Specify the base dir for the modules', 'str', 'store', MODULES_BASEDIR),
         'check-cache-age': ('Show age in seconds of oldest cache and exit', None, 'store_true', False),
     }
@@ -133,7 +133,7 @@ def main():
     # give a warning when the cache is older than --freshness-threshold
     if age > opts.options.freshness_threshold * 60:
         errmsg = "Lmod cache is not fresh"
-        logger.warn(errmsg)
+        logger.warning(errmsg)
 
     try:
         if opts.options.create_cache:

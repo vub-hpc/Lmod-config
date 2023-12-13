@@ -1,7 +1,7 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.6
-Release: 2
+Version: 1.7
+Release: 1
 License: GPL
 Group: Applications/System
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
@@ -40,6 +40,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Wed Dec 13 2023 Samuel Moors <samuel.moors@vub.be>
+- Set default basedir OS to Rocky 8
 * Wed Nov 29 2023 Ward Poelmans <ward.poelmans@vub.be>
 - Hide legacy software trees (CO7)
 * Thu Nov 09 2023 Alex Domingo <alex.domingo.toro@vub.be>
