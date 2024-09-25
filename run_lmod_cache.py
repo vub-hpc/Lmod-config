@@ -48,7 +48,8 @@ def run_cache_create(basedir, archs=None):
             continue
         logger.info("Creating cache for %s", arch)
         modsubpathglob = os.path.join(modpath, "20[0-9][0-9][ab]", "all")
-        modsubpaths = os.pathsep.join(sorted(glob.glob(modsubpathglob)))
+        modsubpathsystem = glob.glob(os.path.join(modpath, 'system', 'all'))
+        modsubpaths = os.pathsep.join(sorted(glob.glob(modsubpathglob)) + modsubpathsystem)
 
         cachedir = os.path.join(basedir, arch, "cacheDir")
         systemfile = os.path.join(cachedir, "system.txt")
