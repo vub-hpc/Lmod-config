@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.7
+Version: 1.8
 Release: 1
 License: GPL
 Group: Applications/System
@@ -40,6 +40,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Wed Sep 25 2024 Samuel Moors <samuel.moors@vub.be>
+- Add system modules path to Lmod cache
 * Wed Dec 13 2023 Samuel Moors <samuel.moors@vub.be>
 - Set default basedir OS to Rocky 8
 * Wed Nov 29 2023 Ward Poelmans <ward.poelmans@vub.be>
