@@ -87,7 +87,7 @@ local function load_hook(t)
     if frameStk:atTop() then
         if age > 7 then
             LmodWarning{msg="vub_very_old_module", fullName=t.modFullName}
-        elseif age > 5 then
+        elseif age > 6 then
             LmodMessage{msg="vub_old_module", fullName=t.modFullName}
         end
     end
@@ -248,7 +248,7 @@ local function visible_hook(modT)
         if not mt:exists('legacy-software') then
             modT.isVisible = false
         end
-    elseif module_age(modT) > 5 then
+    elseif module_age(modT) > 6 then
         modT.isVisible = false
     end
 end

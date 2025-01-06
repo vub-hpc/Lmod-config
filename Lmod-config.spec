@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.8
+Version: 1.9
 Release: 1
 License: GPL
 Group: Applications/System
