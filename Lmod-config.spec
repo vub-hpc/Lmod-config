@@ -40,6 +40,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Mon Jan 06 2025 Cintia Willemyns <cintia.willemyns@vub.be>
+- Hide modules older than module_age 6, instead of 5
 * Wed Sep 25 2024 Samuel Moors <samuel.moors@vub.be>
 - Add system modules path to Lmod cache
 * Wed Dec 13 2023 Samuel Moors <samuel.moors@vub.be>
