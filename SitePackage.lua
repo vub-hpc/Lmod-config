@@ -256,25 +256,48 @@ end
 
 local function get_avail_memory()
     -- If a limit is set, return the maximum allowed memory, else nil
-
-    -- look for the memory cgroup (if any)
     local cgroup = nil
+    local memory_file = nil
+
+    -- look for the memory cgroup (if any):
+    -- for cgroupv2: find the hierarchegy and the memory controller
+    -- for cgroupv1: look for the memory controller
+    local lines = {}
     for line in io.lines("/proc/self/cgroup") do
-        cgroup = line:match("^[0-9]+:memory:(.*)$")
-        if cgroup then
-            break
+        table.insert(lines, line)
+    end
+
+    -- if it's one line: cgroupv2
+    if #lines == 1 then
+        cgroup = lines[1]:match("^[0-9]+::(.*)$")
+
+        if not cgroup then
+            return nil
         end
+
+        -- Slurm tasks are only limited by the job step that launched it
+        cgroup = cgroup:gsub("/task_[%d]+$", "")
+
+        -- read the current maximum allowed memory usage (memory)
+        memory_file = io.open("/sys/fs/cgroup/" .. cgroup .. "/memory.max")
+    else
+        for _, line in ipairs(lines) do
+            cgroup = line:match("^[0-9]+:memory:(.*)$")
+            if cgroup then
+                break
+            end
+        end
+
+        if not cgroup then
+            return nil
+        end
+
+        -- Slurm tasks are only limited by the job step that launched it
+        cgroup = cgroup:gsub("/task_[%d]+$", "")
+
+        -- read the current maximum allowed memory usage (memory + swap)
+        memory_file = io.open("/sys/fs/cgroup/memory/" .. cgroup .. "/memory.memsw.limit_in_bytes")
     end
-
-    if not cgroup then
-        return nil
-    end
-
-    -- Slurm tasks are only limited by the job step that launched it
-    cgroup = cgroup:gsub("/task_[%d]+$", "")
-
-    -- read the current maximum allowed memory usage (memory + swap)
-    local memory_file = io.open("/sys/fs/cgroup/memory/" .. cgroup .. "/memory.memsw.limit_in_bytes")
 
     if not memory_file then
         return nil
