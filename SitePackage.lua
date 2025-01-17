@@ -266,7 +266,7 @@ local function get_avail_memory()
     end
 
     local cgroup = nil
-    local memory_filepath = nil
+    local memory_filepath
     -- if it's one line: cgroupv2
     if #lines == 1 then
         cgroup = lines[1]:match("^[0-9]+::(.*)$")
