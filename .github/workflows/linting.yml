@@ -15,6 +15,6 @@ jobs:
         run: rpmlint Lmod-config.spec
 
       - name: Run luacheck
-        uses: lunarmodules/luacheck@v0
+        uses: lunarmodules/luacheck@v1
         with:
           args: -g .
