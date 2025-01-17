@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.9
+Version: 1.10
 Release: 1
 License: GPL
 Group: Applications/System
@@ -40,6 +40,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Fri Jan 17 2025 Alex Domingo <alex.domingo.toro@vub.be>
+- Fix get_avail_memory for cgroups v1/v2
 * Mon Jan 06 2025 Cintia Willemyns <cintia.willemyns@vub.be>
 - Hide modules older than module_age 6, instead of 5
 * Wed Sep 25 2024 Samuel Moors <samuel.moors@vub.be>
