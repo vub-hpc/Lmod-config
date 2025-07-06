@@ -1,12 +1,13 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.10
+Version: 1.11
 Release: 1
 License: GPL
 Group: Applications/System
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
 BuildArch: noarch
 Requires: Lmod
+Requires: lua-posix
 Source0: run_lmod_cache.py
 Source1: SitePackage.lua
 Source2: admin.list
@@ -40,6 +41,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Sun Jul 06 2025 Ward Poelmans <ward.poelmans@vub.be>
+- Use syslog directly to log
 * Fri Jan 17 2025 Alex Domingo <alex.domingo.toro@vub.be>
 - Fix get_avail_memory for cgroups v1/v2
 * Mon Jan 06 2025 Cintia Willemyns <cintia.willemyns@vub.be>
