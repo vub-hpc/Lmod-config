@@ -8,8 +8,8 @@
 require("strict")
 require("cmdfuncs")
 require("utils")
-require("lmod_system_execute")
 require("parseVersion")
+local syslog = require("posix.syslog")
 local Dbg   = require("Dbg")
 local dbg   = Dbg:dbg()
 local hook  = require("Hook")
@@ -24,7 +24,7 @@ local function logmsg(logTbl)
     -- logTbl[#logTbl+1] = {'log_key', 'log_value'}
 
     local cluster = os.getenv("VSC_INSTITUTE_CLUSTER") or ""
-    local jobid = os.getenv("PBS_JOBID") or os.getenv("SLURM_JOB_ID") or ""
+    local jobid = os.getenv("SLURM_JOB_ID") or ""
     local user = os.getenv("USER")
     local arch = os.getenv("VSC_ARCH_LOCAL") or ""
 
@@ -32,12 +32,14 @@ local function logmsg(logTbl)
                               user, cluster, arch, jobid)
 
     for _, val in ipairs(logTbl) do
-        msg = msg .. string.format(", %s=%q", val[1], val[2] or "")
+        msg = msg .. string.format(", %s=%s", val[1], val[2] or "")
     end
 
     -- Don't log any modules load by the monitoring
     if user ~= "zabbix" then
-        lmod_system_execute("/bin/logger -t lmod -p user.notice -- " .. msg)
+        syslog.openlog("lmod")
+        syslog.syslog(syslog.LOG_NOTICE, msg)
+        syslog.closelog()
     end
 end
 
