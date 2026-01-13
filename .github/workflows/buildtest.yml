@@ -5,7 +5,7 @@ jobs:
   rpmbuild:
       runs-on: ubuntu-latest
       container:
-        image: rockylinux:8
+        image: rockylinux:9
       steps:
       - name: Checkout code
         uses: actions/checkout@v3
