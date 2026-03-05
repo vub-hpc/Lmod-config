@@ -15,14 +15,16 @@ This script runs the Lmod cache creation script.
 It also can check if the age of the current age and will report if it's too old.
 
 @author: Ward Poelmans (Vrije Universiteit Brussel)
+@author: Samuel Moors (Vrije Universiteit Brussel)
 """
 import glob
 import json
 import os
 import sys
 import time
+
 from vsc.utils import fancylogger
-from vsc.utils.run import run as run_simple
+from vsc.utils.run import run as run_simple, asyncloop
 from vsc.utils.generaloption import SimpleOption
 
 # log setup
@@ -30,19 +32,29 @@ logger = fancylogger.getLogger(__name__)
 fancylogger.logToScreen(True)
 fancylogger.setLogLevelInfo()
 
-MODULES_BASEDIR = '/apps/brussel/RL8'
+MODULES_BASEDIR = '/apps/brussel/RL9'
+
+
+def _get_archs(archs, basedir):
+    """Helper to get a list of all architectures in basedir"""
+    if not archs:
+        return os.listdir(basedir)
+    return archs
+
+
+def _get_lmod_dir():
+    """Helper to resolve Lmod directory."""
+    lmod_dir = os.environ.get("LMOD_DIR")
+    if not lmod_dir:
+        raise RuntimeError("Cannot find $LMOD_DIR in the environment.")
+    return lmod_dir
 
 
 def run_cache_create(basedir, archs=None):
     """Run the script to create the Lmod cache"""
-    lmod_dir = os.environ.get("LMOD_DIR", None)
-    if not lmod_dir:
-        raise RuntimeError("Cannot find $LMOD_DIR in the environment.")
+    lmod_dir = _get_lmod_dir()
 
-    if not archs:
-        archs = os.listdir(basedir)
-
-    for arch in archs:
+    for arch in _get_archs(archs, basedir):
         modpath = os.path.join(basedir, arch, "modules")
         if not os.path.isdir(modpath):
             continue
@@ -62,14 +74,34 @@ def run_cache_create(basedir, archs=None):
     return 0, ''
 
 
+def run_spider_create(basedir, archs=None, modulepath=None):
+    """Run the script to create the Lmod cache"""
+    lmod_dir = _get_lmod_dir()
+
+    for arch in _get_archs(archs, basedir):
+        cachedir = os.path.join(basedir, arch, "cacheDir")
+        jsonfile = os.path.join(cachedir, "hydra.json")
+
+        if not modulepath:
+            modulepath = os.getenv('MODULEPATH')
+            if not modulepath:
+                raise RuntimeError("Cannot find $MODULEPATH in the environment.")
+
+        logger.info("Creating Spider cache for %s", arch)
+        cmd = f'{lmod_dir}/spider -o spider-json {modulepath}'
+        exitcode, result = asyncloop(cmd)
+        if exitcode != 0:
+            return exitcode, result
+
+        with open(jsonfile, 'w') as f:
+            f.write(result)
+
+
 def find_oldest_cache(basedir, archs=None):
     """Find the oldest Lmod cache"""
-    if not archs:
-        archs = os.listdir(basedir)
-
     oldest = time.time()
 
-    for arch in archs:
+    for arch in _get_archs(archs, basedir):
         systemfile = os.path.join(basedir, arch, "cacheDir", "system.txt")
         if not os.path.isfile(systemfile):
             continue
@@ -114,12 +146,14 @@ def main():
     """
     options = {
         'create-cache': ('Create the Lmod cache', None, 'store_true', False),
+        'create-spider-cache': ('Run the spider command to generate a spider cache', None, 'store_true', False),
         'architecture': ('Specify the architecture to create the cache for. Default: all architectures',
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
                                 'int', 'store', 60 * 7),  # cron runs every 6 hours
         'module-basedir': ('Specify the base dir for the modules', 'str', 'store', MODULES_BASEDIR),
         'check-cache-age': ('Show age in seconds of oldest cache and exit', None, 'store_true', False),
+        'modulepath': ('Specify the module path. Default: $MODULEPATH', 'str', 'store', False),
     }
     opts = SimpleOption(options)
 
@@ -130,14 +164,27 @@ def main():
         print(int(age))
         sys.exit()
 
+    if opts.options.create_spider_cache:
+        try:
+            opts.log.info("Updating the Spider cache")
+            run_spider_create(opts.options.module_basedir, archs=opts.options.architecture,
+                              modulepath=opts.options.modulepath)
+            opts.log.info("Spider cache updated.")
+        except RuntimeError as err:
+            logger.exception("Failed to update Spider cache: %s", err)
+            sys.exit(5)
+        except Exception as err:  # pylint: disable=W0703
+            logger.exception("critical exception caught: %s", err)
+            sys.exit(6)
+
     opts.log.info("Checking the Lmod cache freshness")
     # give a warning when the cache is older than --freshness-threshold
     if age > opts.options.freshness_threshold * 60:
         errmsg = "Lmod cache is not fresh"
         logger.warning(errmsg)
 
-    try:
-        if opts.options.create_cache:
+    if opts.options.create_cache:
+        try:
             opts.log.info("Updating the Lmod cache")
             exitcode, msg = run_cache_create(opts.options.module_basedir, archs=opts.options.architecture)
             if exitcode != 0:
@@ -145,12 +192,12 @@ def main():
                 sys.exit(1)
 
             opts.log.info("Lmod cache updated.")
-    except RuntimeError as err:
-        logger.exception("Failed to update Lmod cache: %s", err)
-        sys.exit(3)
-    except Exception as err:  # pylint: disable=W0703
-        logger.exception("critical exception caught: %s", err)
-        sys.exit(4)
+        except RuntimeError as err:
+            logger.exception("Failed to update Lmod cache: %s", err)
+            sys.exit(3)
+        except Exception as err:  # pylint: disable=W0703
+            logger.exception("critical exception caught: %s", err)
+            sys.exit(4)
 
 
 if __name__ == '__main__':
