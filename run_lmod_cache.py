@@ -15,14 +15,16 @@ This script runs the Lmod cache creation script.
 It also can check if the age of the current age and will report if it's too old.
 
 @author: Ward Poelmans (Vrije Universiteit Brussel)
+@author: Samuel Moors (Vrije Universiteit Brussel)
 """
 import glob
 import json
 import os
 import sys
 import time
+
 from vsc.utils import fancylogger
-from vsc.utils.run import run as run_simple
+from vsc.utils.run import run as run_simple, asyncloop
 from vsc.utils.generaloption import SimpleOption
 
 # log setup
@@ -30,26 +32,44 @@ logger = fancylogger.getLogger(__name__)
 fancylogger.logToScreen(True)
 fancylogger.setLogLevelInfo()
 
-MODULES_BASEDIR = '/apps/brussel/RL8'
+MODULES_BASEDIR = '/apps/brussel/RL9'
+
+
+def _get_archs(basedir, archs=None):
+    """Helper to get a list of all architectures in basedir"""
+    if not archs:
+        return os.listdir(basedir)
+    return archs
+
+
+def _get_lmod_dir():
+    """Helper to resolve Lmod directory."""
+    lmod_dir = os.environ.get("LMOD_DIR")
+    if not lmod_dir:
+        raise RuntimeError("Cannot find $LMOD_DIR in the environment.")
+    return lmod_dir
+
+
+def _get_modsubpaths(basedir, arch):
+    """Helper to get full module paths"""
+    modpath = os.path.join(basedir, arch, "modules")
+    if not os.path.isdir(modpath):
+        return None
+    modsubpathglob = os.path.join(modpath, "20[0-9][0-9][ab]", "all")
+    modsubpathsystem = glob.glob(os.path.join(modpath, 'system', 'all'))
+    return os.pathsep.join(sorted(glob.glob(modsubpathglob)) + modsubpathsystem)
 
 
 def run_cache_create(basedir, archs=None):
     """Run the script to create the Lmod cache"""
-    lmod_dir = os.environ.get("LMOD_DIR", None)
-    if not lmod_dir:
-        raise RuntimeError("Cannot find $LMOD_DIR in the environment.")
+    lmod_dir = _get_lmod_dir()
 
-    if not archs:
-        archs = os.listdir(basedir)
-
-    for arch in archs:
-        modpath = os.path.join(basedir, arch, "modules")
-        if not os.path.isdir(modpath):
-            continue
+    for arch in _get_archs(basedir, archs):
         logger.info("Creating cache for %s", arch)
-        modsubpathglob = os.path.join(modpath, "20[0-9][0-9][ab]", "all")
-        modsubpathsystem = glob.glob(os.path.join(modpath, 'system', 'all'))
-        modsubpaths = os.pathsep.join(sorted(glob.glob(modsubpathglob)) + modsubpathsystem)
+
+        modsubpaths = _get_modsubpaths(basedir, arch)
+        if not modsubpaths:
+            continue
 
         cachedir = os.path.join(basedir, arch, "cacheDir")
         systemfile = os.path.join(cachedir, "system.txt")
@@ -62,14 +82,36 @@ def run_cache_create(basedir, archs=None):
     return 0, ''
 
 
+def run_spider_create(basedir, archs=None):
+    """Run the script to create the Spider cache"""
+    lmod_dir = _get_lmod_dir()
+
+    for arch in _get_archs(basedir, archs):
+        logger.info("Creating Spider cache for %s", arch)
+
+        modsubpaths = _get_modsubpaths(basedir, arch)
+        if not modsubpaths:
+            continue
+
+        cachedir = os.path.join(basedir, arch, "cacheDir")
+        jsonfile = os.path.join(cachedir, "hydra.json")
+
+        cmd = f'{lmod_dir}/spider -o spider-json {modsubpaths}'
+        exitcode, result = asyncloop(cmd)
+        if exitcode != 0:
+            return exitcode, result
+
+        with open(jsonfile, 'w') as f:
+            f.write(result)
+
+    return 0, ''
+
+
 def find_oldest_cache(basedir, archs=None):
     """Find the oldest Lmod cache"""
-    if not archs:
-        archs = os.listdir(basedir)
-
     oldest = time.time()
 
-    for arch in archs:
+    for arch in _get_archs(basedir, archs):
         systemfile = os.path.join(basedir, arch, "cacheDir", "system.txt")
         if not os.path.isfile(systemfile):
             continue
@@ -114,6 +156,7 @@ def main():
     """
     options = {
         'create-cache': ('Create the Lmod cache', None, 'store_true', False),
+        'create-spider-cache': ('Run the spider command to generate a spider cache', None, 'store_true', False),
         'architecture': ('Specify the architecture to create the cache for. Default: all architectures',
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
@@ -130,14 +173,26 @@ def main():
         print(int(age))
         sys.exit()
 
+    if opts.options.create_spider_cache:
+        try:
+            opts.log.info("Updating the Spider cache")
+            run_spider_create(opts.options.module_basedir, archs=opts.options.architecture)
+            opts.log.info("Spider cache updated.")
+        except RuntimeError as err:
+            logger.exception("Failed to update Spider cache: %s", err)
+            sys.exit(5)
+        except Exception as err:  # pylint: disable=W0703
+            logger.exception("critical exception caught: %s", err)
+            sys.exit(6)
+
     opts.log.info("Checking the Lmod cache freshness")
     # give a warning when the cache is older than --freshness-threshold
     if age > opts.options.freshness_threshold * 60:
         errmsg = "Lmod cache is not fresh"
         logger.warning(errmsg)
 
-    try:
-        if opts.options.create_cache:
+    if opts.options.create_cache:
+        try:
             opts.log.info("Updating the Lmod cache")
             exitcode, msg = run_cache_create(opts.options.module_basedir, archs=opts.options.architecture)
             if exitcode != 0:
@@ -145,12 +200,12 @@ def main():
                 sys.exit(1)
 
             opts.log.info("Lmod cache updated.")
-    except RuntimeError as err:
-        logger.exception("Failed to update Lmod cache: %s", err)
-        sys.exit(3)
-    except Exception as err:  # pylint: disable=W0703
-        logger.exception("critical exception caught: %s", err)
-        sys.exit(4)
+        except RuntimeError as err:
+            logger.exception("Failed to update Lmod cache: %s", err)
+            sys.exit(3)
+        except Exception as err:  # pylint: disable=W0703
+            logger.exception("critical exception caught: %s", err)
+            sys.exit(4)
 
 
 if __name__ == '__main__':
