@@ -35,7 +35,7 @@ fancylogger.setLogLevelInfo()
 MODULES_BASEDIR = '/apps/brussel/RL9'
 
 
-def _get_archs(archs, basedir):
+def _get_archs(basedir, archs=None):
     """Helper to get a list of all architectures in basedir"""
     if not archs:
         return os.listdir(basedir)
@@ -50,18 +50,26 @@ def _get_lmod_dir():
     return lmod_dir
 
 
+def _get_modsubpaths(basedir, arch):
+    """Helper to get full module paths"""
+    modpath = os.path.join(basedir, arch, "modules")
+    if not os.path.isdir(modpath):
+        return None
+    modsubpathglob = os.path.join(modpath, "20[0-9][0-9][ab]", "all")
+    modsubpathsystem = glob.glob(os.path.join(modpath, 'system', 'all'))
+    return os.pathsep.join(sorted(glob.glob(modsubpathglob)) + modsubpathsystem)
+
+
 def run_cache_create(basedir, archs=None):
     """Run the script to create the Lmod cache"""
     lmod_dir = _get_lmod_dir()
 
-    for arch in _get_archs(archs, basedir):
-        modpath = os.path.join(basedir, arch, "modules")
-        if not os.path.isdir(modpath):
-            continue
+    for arch in _get_archs(basedir, archs):
         logger.info("Creating cache for %s", arch)
-        modsubpathglob = os.path.join(modpath, "20[0-9][0-9][ab]", "all")
-        modsubpathsystem = glob.glob(os.path.join(modpath, 'system', 'all'))
-        modsubpaths = os.pathsep.join(sorted(glob.glob(modsubpathglob)) + modsubpathsystem)
+
+        modsubpaths = _get_modsubpaths(basedir, arch)
+        if not modsubpaths:
+            continue
 
         cachedir = os.path.join(basedir, arch, "cacheDir")
         systemfile = os.path.join(cachedir, "system.txt")
@@ -74,21 +82,21 @@ def run_cache_create(basedir, archs=None):
     return 0, ''
 
 
-def run_spider_create(basedir, archs=None, modulepath=None):
-    """Run the script to create the Lmod cache"""
+def run_spider_create(basedir, archs=None):
+    """Run the script to create the Spider cache"""
     lmod_dir = _get_lmod_dir()
 
-    for arch in _get_archs(archs, basedir):
+    for arch in _get_archs(basedir, archs):
+        logger.info("Creating Spider cache for %s", arch)
+
+        modsubpaths = _get_modsubpaths(basedir, arch)
+        if not modsubpaths:
+            continue
+
         cachedir = os.path.join(basedir, arch, "cacheDir")
         jsonfile = os.path.join(cachedir, "hydra.json")
 
-        if not modulepath:
-            modulepath = os.getenv('MODULEPATH')
-            if not modulepath:
-                raise RuntimeError("Cannot find $MODULEPATH in the environment.")
-
-        logger.info("Creating Spider cache for %s", arch)
-        cmd = f'{lmod_dir}/spider -o spider-json {modulepath}'
+        cmd = f'{lmod_dir}/spider -o spider-json {modsubpaths}'
         exitcode, result = asyncloop(cmd)
         if exitcode != 0:
             return exitcode, result
@@ -96,12 +104,14 @@ def run_spider_create(basedir, archs=None, modulepath=None):
         with open(jsonfile, 'w') as f:
             f.write(result)
 
+    return 0, ''
+
 
 def find_oldest_cache(basedir, archs=None):
     """Find the oldest Lmod cache"""
     oldest = time.time()
 
-    for arch in _get_archs(archs, basedir):
+    for arch in _get_archs(basedir, archs):
         systemfile = os.path.join(basedir, arch, "cacheDir", "system.txt")
         if not os.path.isfile(systemfile):
             continue
@@ -153,7 +163,6 @@ def main():
                                 'int', 'store', 60 * 7),  # cron runs every 6 hours
         'module-basedir': ('Specify the base dir for the modules', 'str', 'store', MODULES_BASEDIR),
         'check-cache-age': ('Show age in seconds of oldest cache and exit', None, 'store_true', False),
-        'modulepath': ('Specify the module path. Default: $MODULEPATH', 'str', 'store', False),
     }
     opts = SimpleOption(options)
 
@@ -167,8 +176,7 @@ def main():
     if opts.options.create_spider_cache:
         try:
             opts.log.info("Updating the Spider cache")
-            run_spider_create(opts.options.module_basedir, archs=opts.options.architecture,
-                              modulepath=opts.options.modulepath)
+            run_spider_create(opts.options.module_basedir, archs=opts.options.architecture)
             opts.log.info("Spider cache updated.")
         except RuntimeError as err:
             logger.exception("Failed to update Spider cache: %s", err)
