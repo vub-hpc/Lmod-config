@@ -15,6 +15,13 @@ local dbg   = Dbg:dbg()
 local hook  = require("Hook")
 local FrameStk  = require("FrameStk")
 local MT    = require("MT")
+local cluster = os.getenv("VSC_INSTITUTE_CLUSTER") or ""
+local email
+if cluster == "sofia" then
+    email = "support@vscentrum.be"
+else
+    email = "hpc@vub.be"
+end
 
 
 local function logmsg(logTbl)
@@ -23,7 +30,6 @@ local function logmsg(logTbl)
     -- added in order. Expect format:
     -- logTbl[#logTbl+1] = {'log_key', 'log_value'}
 
-    local cluster = os.getenv("VSC_INSTITUTE_CLUSTER") or ""
     local jobid = os.getenv("SLURM_JOB_ID") or ""
     local user = os.getenv("USER")
     local arch = os.getenv("VSC_ARCH_LOCAL") or ""
@@ -35,7 +41,7 @@ local function logmsg(logTbl)
         msg = msg .. string.format(", %s=%s", val[1], val[2] or "")
     end
 
-    -- Don't log any modules load by the monitoring
+    -- Don't log any modules loaded by the monitoring
     if user ~= "zabbix" then
         syslog.openlog("lmod")
         syslog.syslog(syslog.LOG_NOTICE, msg)
@@ -84,13 +90,15 @@ local function load_hook(t)
 
     logmsg(logTbl)
 
-    -- inform/warn users about old modules (only directly loaded ones)
-    local age = module_age(t)
-    if frameStk:atTop() then
-        if age > 7 then
-            LmodWarning{msg="vub_very_old_module", fullName=t.modFullName}
-        elseif age > 6 then
-            LmodMessage{msg="vub_old_module", fullName=t.modFullName}
+    if cluster ~= "sofia" then
+        -- inform/warn users about old modules (only directly loaded ones)
+        local age = module_age(t)
+        if frameStk:atTop() then
+            if age > 7 then
+                LmodWarning{msg="vub_very_old_module", fullName=t.modFullName}
+            elseif age > 6 then
+                LmodMessage{msg="vub_old_module", fullName=t.modFullName}
+            end
         end
     end
 end
@@ -105,7 +113,6 @@ local function restore_hook(t)
 
     dbg.start{"restore_hook"}
 
-    local cluster = os.getenv("VSC_INSTITUTE_CLUSTER")
     local def_cluster = os.getenv("VSC_DEFAULT_CLUSTER_MODULE")
     if (not cluster or not def_cluster) then return end
 
@@ -152,7 +159,7 @@ local function msg_hook(mode, output)
     dbg.print{"Mode is ", mode, "\n"}
 
     if mode == "avail" then
-        output[#output+1] = "\nIf you need software that is not listed, request it at hpc@vub.be\n"
+        output[#output+1] = ("\nIf you need help with software that is not listed, please contact %s\n"):format(email)
     end
 
     dbg.fini()
@@ -193,7 +200,7 @@ local function errwarnmsg_hook(kind, key, msg, t)
     end
 
     if kind == "lmoderror" or kind == "lmodwarning" then
-        msg = msg .. "\nIf you don't understand the warning or error, contact the helpdesk at hpc@vub.be"
+        msg = msg .. ("\nIf you don't understand the warning or error, please contact %s"):format(email)
     end
 
     -- log any errors users get
@@ -244,14 +251,15 @@ local function visible_hook(modT)
         modT.isVisible = false
     elseif modT.fullName:find("JupyterHub/") then
         modT.isVisible = false
-    elseif modT.fullName:find("AlphaFold/.*ColabFold") then
-        modT.isVisible = false
-    elseif modT.fn:find("^/apps/brussel/CO7/") then
-        if not mt:exists('legacy-software') then
+    elseif cluster ~= "sofia" then
+        if modT.fn:find("^/apps/brussel/CO7/") then
+            if not mt:exists('legacy-software') then
+                modT.isVisible = false
+                return
+            end
+        elseif module_age(modT) > 6 then
             modT.isVisible = false
         end
-    elseif module_age(modT) > 6 then
-        modT.isVisible = false
     end
 end
 

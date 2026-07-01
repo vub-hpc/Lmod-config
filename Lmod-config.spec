@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.12
+Version: 1.13
 Release: 1
 License: GPL
 Group: Applications/System
@@ -41,6 +41,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Tue Jun 30 2026 Samuel Moors <samuel.moors@vub.be>
+- Update SitePackage.lua for sofia
 * Thu Mar 05 2026 Samuel Moors <samuel.moors@vub.be>
 - Add option to create spider cache
 * Sun Jul 06 2025 Ward Poelmans <ward.poelmans@vub.be>
