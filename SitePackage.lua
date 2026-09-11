@@ -264,6 +264,53 @@ local function visible_hook(modT)
 end
 
 
+local native_userInGroup = userInGroup
+
+local function userInGroupFallback(group)
+    -- Apptainer doesn't inherit supplementary groups, but it injects them
+    -- into /etc/group (e.g. "babaqus:x:2610114:vsc12345"), so fall back
+    -- to parsing that.
+    dbg.start{"userInGroupFallback"}
+    dbg.print{"group: ", group, "\n"}
+
+    if native_userInGroup(group) then
+        dbg.fini()
+        return true
+    end
+
+    local user = os.getenv("USER") or ""
+    if user == "" then
+        dbg.fini()
+        return false
+    end
+
+    local f = io.open("/etc/group", "r")
+    if not f then
+        dbg.fini()
+        return false
+    end
+
+    local in_group = false
+    for line in f:lines() do
+        local name, members = line:match("^([^:]*):[^:]*:[^:]*:(.*)$")
+        if name == group then
+            for member in members:gmatch("[^,]+") do
+                if member == user then
+                    in_group = true
+                end
+            end
+            break
+        end
+    end
+    f:close()
+
+    dbg.print{"in_group: ", in_group, "\n"}
+    dbg.fini()
+
+    return in_group
+end
+
+
 local function get_avail_memory()
     -- If a limit is set, return the maximum allowed memory, else nil
 
@@ -330,3 +377,8 @@ hook.register("isVisibleHook", visible_hook)
 sandbox_registration{
     get_avail_memory = get_avail_memory,
 }
+if os.getenv("APPTAINER_CONTAINER") then
+    sandbox_registration{
+        userInGroup = userInGroupFallback,
+    }
+end
