@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.13
+Version: 1.14
 Release: 1
 License: GPL
 Group: Applications/System
@@ -41,6 +41,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Fri Sep 11 2026 Jarne Renders <jarne.thijs.renders@vub.be>
+- Fall back to /etc/group for userInGroup() inside Apptainer containers
 * Tue Jun 30 2026 Samuel Moors <samuel.moors@vub.be>
 - Update SitePackage.lua for sofia
 * Thu Mar 05 2026 Samuel Moors <samuel.moors@vub.be>
