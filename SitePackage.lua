@@ -297,6 +297,7 @@ local function userInGroupFallback(group)
             for member in members:gmatch("[^,]+") do
                 if member == user then
                     in_group = true
+                    break
                 end
             end
             break
