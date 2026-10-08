@@ -105,9 +105,11 @@ local function load_hook(t)
         -- inform/warn users about old modules (only directly loaded ones)
         local age = module_age(t)
         if age and frameStk:atTop() then
-            if age > 7 then
+            if age > 8 then
+                -- warning for 4 years old
                 LmodWarning{msg="vub_very_old_module", fullName=t.modFullName}
             elseif age > 6 then
+                -- inform for 3 years old
                 LmodMessage{msg="vub_old_module", fullName=t.modFullName}
             end
         end
