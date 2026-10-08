@@ -55,12 +55,22 @@ local function module_age(modT)
     -- modT should have a entry 'fn' with the module path
     -- returns age (in months) between module toolchain generation and current toolchain generation
 
-    local tcyear, tcsuffix = modT.fn:match("^/apps/brussel/.*/modules/(20[0-9][0-9])([ab])/all/")
+    local tcyear, tcsuffix = modT.fn:match("^/apps/brussel/.*/modules/(20[0-9][0-9])([^/]+)/all/")
     if tcyear == nil or tcsuffix == nil then return 0 end
 
+    -- old style toolchains: {year}[ab]
+    -- a = January, b = July
     local suffixmonth = {a=1, b=7}
-
     local tcmonth = suffixmonth[tcsuffix]
+    -- new style toolchains: {year}.%d
+    -- 1 = January, 2 = May, 3 = September
+    if tcmonth == nil then
+        local quarter = tonumber(tcsuffix:match("^%.(%d+)$"))
+        tcmonth = quarter and (quarter - 1) * 4 + 1
+    end
+    -- anything else is rejected
+    if tcmonth == nil or tcmonth < 1 or tcmonth > 12 then return 0 end
+
     local tcstamp = os.time({year=tcyear, month=tcmonth, day=1})
 
     -- 1 month is 2629743 seconds
