@@ -53,10 +53,11 @@ end
 local function module_age(modT)
     -- Calculate the age of a module, relative to the current toolchain generation
     -- modT should have a entry 'fn' with the module path
-    -- returns age (in months) between module toolchain generation and current toolchain generation
+    -- returns the age in 6-month toolchain generations, or nil when the
+    -- toolchain version cannot be determined from the module path
 
     local tcyear, tcsuffix = modT.fn:match("^/apps/brussel/.*/modules/(20[0-9][0-9])([^/]+)/all/")
-    if tcyear == nil or tcsuffix == nil then return 0 end
+    if tcyear == nil or tcsuffix == nil then return nil end
 
     -- old style toolchains: {year}[ab]
     -- a = January, b = July
@@ -69,7 +70,7 @@ local function module_age(modT)
         tcmonth = quarter and (quarter - 1) * 4 + 1
     end
     -- anything else is rejected
-    if tcmonth == nil or tcmonth < 1 or tcmonth > 12 then return 0 end
+    if tcmonth == nil or tcmonth < 1 or tcmonth > 12 then return nil end
 
     local tcstamp = os.time({year=tcyear, month=tcmonth, day=1})
 
@@ -103,7 +104,7 @@ local function load_hook(t)
     if cluster ~= "sofia" then
         -- inform/warn users about old modules (only directly loaded ones)
         local age = module_age(t)
-        if frameStk:atTop() then
+        if age and frameStk:atTop() then
             if age > 7 then
                 LmodWarning{msg="vub_very_old_module", fullName=t.modFullName}
             elseif age > 6 then
@@ -267,8 +268,11 @@ local function visible_hook(modT)
                 modT.isVisible = false
                 return
             end
-        elseif module_age(modT) > 6 then
-            modT.isVisible = false
+        else
+            local age = module_age(modT)
+            if age and age > 6 then
+                modT.isVisible = false
+            end
         end
     end
 end
