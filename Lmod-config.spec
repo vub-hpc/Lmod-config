@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.14
+Version: 1.15
 Release: 1
 License: GPL
 Group: Applications/System
@@ -41,6 +41,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Thu Oct 08 2026 Alex Domingo <alex.domingo.toro@vub.be>
+- Add support for new toolchain versioning with year.%d
 * Fri Sep 11 2026 Jarne Renders <jarne.thijs.renders@vub.be>
 - Fall back to /etc/group for userInGroup() inside Apptainer containers
 * Tue Jun 30 2026 Samuel Moors <samuel.moors@vub.be>

@@ -53,14 +53,25 @@ end
 local function module_age(modT)
     -- Calculate the age of a module, relative to the current toolchain generation
     -- modT should have a entry 'fn' with the module path
-    -- returns age (in months) between module toolchain generation and current toolchain generation
+    -- returns the age in 6-month toolchain generations, or nil when the
+    -- toolchain version cannot be determined from the module path
 
-    local tcyear, tcsuffix = modT.fn:match("^/apps/brussel/.*/modules/(20[0-9][0-9])([ab])/all/")
-    if tcyear == nil or tcsuffix == nil then return 0 end
+    local tcyear, tcsuffix = modT.fn:match("^/apps/brussel/.*/modules/(20[0-9][0-9])([^/]+)/all/")
+    if tcyear == nil or tcsuffix == nil then return nil end
 
+    -- old style toolchains: {year}[ab]
+    -- a = January, b = July
     local suffixmonth = {a=1, b=7}
-
     local tcmonth = suffixmonth[tcsuffix]
+    -- new style toolchains: {year}.%d
+    -- 1 = January, 2 = May, 3 = September
+    if tcmonth == nil then
+        local quarter = tonumber(tcsuffix:match("^%.(%d+)$"))
+        tcmonth = quarter and (quarter - 1) * 4 + 1
+    end
+    -- anything else is rejected
+    if tcmonth == nil or tcmonth < 1 or tcmonth > 12 then return nil end
+
     local tcstamp = os.time({year=tcyear, month=tcmonth, day=1})
 
     -- 1 month is 2629743 seconds
@@ -93,10 +104,12 @@ local function load_hook(t)
     if cluster ~= "sofia" then
         -- inform/warn users about old modules (only directly loaded ones)
         local age = module_age(t)
-        if frameStk:atTop() then
-            if age > 7 then
+        if age and frameStk:atTop() then
+            if age > 8 then
+                -- warning for 4 years old
                 LmodWarning{msg="vub_very_old_module", fullName=t.modFullName}
             elseif age > 6 then
+                -- inform for 3 years old
                 LmodMessage{msg="vub_old_module", fullName=t.modFullName}
             end
         end
@@ -257,8 +270,11 @@ local function visible_hook(modT)
                 modT.isVisible = false
                 return
             end
-        elseif module_age(modT) > 6 then
-            modT.isVisible = false
+        else
+            local age = module_age(modT)
+            if age and age > 6 then
+                modT.isVisible = false
+            end
         end
     end
 end
