@@ -82,7 +82,7 @@ def run_cache_create(basedir, archs=None):
     return 0, ''
 
 
-def run_spider_create(basedir, archs=None):
+def run_spider_create(basedir, cluster_name, archs=None):
     """Run the script to create the Spider cache"""
     lmod_dir = _get_lmod_dir()
 
@@ -94,7 +94,7 @@ def run_spider_create(basedir, archs=None):
             continue
 
         cachedir = os.path.join(basedir, arch, "cacheDir")
-        jsonfile = os.path.join(cachedir, "hydra.json")
+        jsonfile = os.path.join(cachedir, f"{cluster_name}.json")
 
         cmd = f'{lmod_dir}/spider -o spider-json {modsubpaths}'
         exitcode, result = asyncloop(cmd)
@@ -157,6 +157,8 @@ def main():
     options = {
         'create-cache': ('Create the Lmod cache', None, 'store_true', False),
         'create-spider-cache': ('Run the spider command to generate a spider cache', None, 'store_true', False),
+        'cluster-name': ('Name of the Open OnDemand cluster, used as the base name of the spider cache file',
+                         'str', 'store', None),
         'architecture': ('Specify the architecture to create the cache for. Default: all architectures',
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
@@ -165,6 +167,10 @@ def main():
         'check-cache-age': ('Show age in seconds of oldest cache and exit', None, 'store_true', False),
     }
     opts = SimpleOption(options)
+
+    if opts.options.create_spider_cache and not opts.options.cluster_name:
+        opts.log.error("Option --cluster-name is required when using --create-spider-cache")
+        sys.exit(2)
 
     timestamp = find_oldest_cache(opts.options.module_basedir, archs=opts.options.architecture)
     age = time.time() - timestamp
@@ -176,7 +182,8 @@ def main():
     if opts.options.create_spider_cache:
         try:
             opts.log.info("Updating the Spider cache")
-            run_spider_create(opts.options.module_basedir, archs=opts.options.architecture)
+            run_spider_create(opts.options.module_basedir, cluster_name=opts.options.cluster_name,
+                              archs=opts.options.architecture)
             opts.log.info("Spider cache updated.")
         except RuntimeError as err:
             logger.exception("Failed to update Spider cache: %s", err)
