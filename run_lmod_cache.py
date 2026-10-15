@@ -20,11 +20,12 @@ It also can check if the age of the current age and will report if it's too old.
 import glob
 import json
 import os
+import subprocess
 import sys
 import time
 
 from vsc.utils import fancylogger
-from vsc.utils.run import run as run_simple, asyncloop
+from vsc.utils.run import run as run_simple
 from vsc.utils.generaloption import SimpleOption
 
 DEFAULT_OS_LOCAL = "RL9"
@@ -103,13 +104,23 @@ def run_spider_create(basedir, cluster_name, archs=None):
         cachedir = os.path.join(basedir, arch, "cacheDir")
         jsonfile = os.path.join(cachedir, f"{cluster_name}.json")
 
-        cmd = f'{lmod_dir}/spider -o spider-json {modsubpaths}'
-        exitcode, result = asyncloop(cmd)
-        if exitcode != 0:
-            return exitcode, result
+        cmd = [os.path.join(lmod_dir, 'spider'), '-o', 'spider-json', modsubpaths]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if proc.returncode != 0:
+            return proc.returncode, proc.stderr.decode('utf-8', 'replace')
 
-        with open(jsonfile, 'w') as f:
-            f.write(result)
+        # validate the spider output before writing it, so that a broken file
+        # never overwrites a working one
+        try:
+            json.loads(proc.stdout)
+        except ValueError as err:
+            errmsg = f"Spider cache for {arch} is not valid JSON: {err}"
+            logger.error(errmsg)
+            return 1, errmsg
+
+        # write the spider output verbatim as bytes to avoid any re-encoding
+        with open(jsonfile, 'wb') as f:
+            f.write(proc.stdout)
 
     return 0, ''
 
@@ -193,8 +204,14 @@ def main():
     if opts.options.create_spider_cache:
         try:
             opts.log.info("Updating the Spider cache")
-            run_spider_create(opts.options.module_basedir, cluster_name=opts.options.cluster_name,
-                              archs=opts.options.architecture)
+            exitcode, msg = run_spider_create(
+                opts.options.module_basedir,
+                cluster_name=opts.options.cluster_name,
+                archs=opts.options.architecture,
+            )
+            if exitcode != 0:
+                logger.error("Spider cache update failed: %s", msg)
+                sys.exit(2)
             opts.log.info("Spider cache updated.")
         except RuntimeError as err:
             logger.exception("Failed to update Spider cache: %s", err)
