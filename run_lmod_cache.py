@@ -27,13 +27,13 @@ from vsc.utils import fancylogger
 from vsc.utils.run import run as run_simple, asyncloop
 from vsc.utils.generaloption import SimpleOption
 
+DEFAULT_OS_LOCAL = "RL9"
+DEFAULT_CLUSTER = "hydra"
+
 # log setup
 logger = fancylogger.getLogger(__name__)
 fancylogger.logToScreen(True)
 fancylogger.setLogLevelInfo()
-
-MODULES_BASEDIR = '/apps/brussel/RL9'
-
 
 def _get_archs(basedir, archs=None):
     """Helper to get a list of all architectures in basedir"""
@@ -48,6 +48,13 @@ def _get_lmod_dir():
     if not lmod_dir:
         raise RuntimeError("Cannot find $LMOD_DIR in the environment.")
     return lmod_dir
+
+
+def _get_modules_basedir(cluster_name):
+    """Helper to determine the default modules base dir from the cluster and OS label"""
+    machine = 'sofia' if cluster_name == 'sofia' else 'brussel'
+    oslabel = os.environ.get('VSC_OS_LOCAL') or DEFAULT_OS_LOCAL
+    return f"/apps/{machine}/{oslabel}"
 
 
 def _get_modsubpaths(basedir, arch):
@@ -163,14 +170,18 @@ def main():
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
                                 'int', 'store', 60 * 7),  # cron runs every 6 hours
-        'module-basedir': ('Specify the base dir for the modules', 'str', 'store', MODULES_BASEDIR),
+        'module-basedir': ('Specify the base dir for the modules', 'str', 'store', None),
         'check-cache-age': ('Show age in seconds of oldest cache and exit', None, 'store_true', False),
     }
     opts = SimpleOption(options)
 
-    if opts.options.create_spider_cache and not opts.options.cluster_name:
-        opts.log.error("Option --cluster-name is required when using --create-spider-cache")
-        sys.exit(2)
+    # determine the cluster name: option, then $VSC_INSTITUTE_CLUSTER, then legacy default
+    if opts.options.cluster_name is None:
+        opts.options.cluster_name = os.environ.get('VSC_INSTITUTE_CLUSTER') or DEFAULT_CLUSTER
+
+    # determine the modules base dir: option, then derived from cluster and OS label
+    if opts.options.module_basedir is None:
+        opts.options.module_basedir = _get_modules_basedir(opts.options.cluster_name)
 
     timestamp = find_oldest_cache(opts.options.module_basedir, archs=opts.options.architecture)
     age = time.time() - timestamp
