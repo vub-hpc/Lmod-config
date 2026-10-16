@@ -20,20 +20,21 @@ It also can check if the age of the current age and will report if it's too old.
 import glob
 import json
 import os
+import subprocess
 import sys
 import time
 
 from vsc.utils import fancylogger
-from vsc.utils.run import run as run_simple, asyncloop
+from vsc.utils.run import run as run_simple
 from vsc.utils.generaloption import SimpleOption
+
+DEFAULT_OS_LOCAL = "RL9"
+DEFAULT_CLUSTER = "hydra"
 
 # log setup
 logger = fancylogger.getLogger(__name__)
 fancylogger.logToScreen(True)
 fancylogger.setLogLevelInfo()
-
-MODULES_BASEDIR = '/apps/brussel/RL9'
-
 
 def _get_archs(basedir, archs=None):
     """Helper to get a list of all architectures in basedir"""
@@ -48,6 +49,13 @@ def _get_lmod_dir():
     if not lmod_dir:
         raise RuntimeError("Cannot find $LMOD_DIR in the environment.")
     return lmod_dir
+
+
+def _get_modules_basedir(cluster_name):
+    """Helper to determine the default modules base dir from the cluster and OS label"""
+    machine = 'sofia' if cluster_name == 'sofia' else 'brussel'
+    oslabel = os.environ.get('VSC_OS_LOCAL') or DEFAULT_OS_LOCAL
+    return f"/apps/{machine}/{oslabel}"
 
 
 def _get_modsubpaths(basedir, arch):
@@ -82,7 +90,7 @@ def run_cache_create(basedir, archs=None):
     return 0, ''
 
 
-def run_spider_create(basedir, archs=None):
+def run_spider_create(basedir, cluster_name, archs=None):
     """Run the script to create the Spider cache"""
     lmod_dir = _get_lmod_dir()
 
@@ -94,15 +102,25 @@ def run_spider_create(basedir, archs=None):
             continue
 
         cachedir = os.path.join(basedir, arch, "cacheDir")
-        jsonfile = os.path.join(cachedir, "hydra.json")
+        jsonfile = os.path.join(cachedir, f"{cluster_name}.json")
 
-        cmd = f'{lmod_dir}/spider -o spider-json {modsubpaths}'
-        exitcode, result = asyncloop(cmd)
-        if exitcode != 0:
-            return exitcode, result
+        cmd = [os.path.join(lmod_dir, 'spider'), '-o', 'spider-json', modsubpaths]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if proc.returncode != 0:
+            return proc.returncode, proc.stderr.decode('utf-8', 'replace')
 
-        with open(jsonfile, 'w') as f:
-            f.write(result)
+        # validate the spider output before writing it, so that a broken file
+        # never overwrites a working one
+        try:
+            json.loads(proc.stdout)
+        except ValueError as err:
+            errmsg = f"Spider cache for {arch} is not valid JSON: {err}"
+            logger.error(errmsg)
+            return 1, errmsg
+
+        # write the spider output verbatim as bytes to avoid any re-encoding
+        with open(jsonfile, 'wb') as f:
+            f.write(proc.stdout)
 
     return 0, ''
 
@@ -157,14 +175,24 @@ def main():
     options = {
         'create-cache': ('Create the Lmod cache', None, 'store_true', False),
         'create-spider-cache': ('Run the spider command to generate a spider cache', None, 'store_true', False),
+        'cluster-name': ('Name of the Open OnDemand cluster, used as the base name of the spider cache file',
+                         'str', 'store', None),
         'architecture': ('Specify the architecture to create the cache for. Default: all architectures',
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
                                 'int', 'store', 60 * 7),  # cron runs every 6 hours
-        'module-basedir': ('Specify the base dir for the modules', 'str', 'store', MODULES_BASEDIR),
+        'module-basedir': ('Specify the base dir for the modules', 'str', 'store', None),
         'check-cache-age': ('Show age in seconds of oldest cache and exit', None, 'store_true', False),
     }
     opts = SimpleOption(options)
+
+    # determine the cluster name: option, then $VSC_INSTITUTE_CLUSTER, then legacy default
+    if opts.options.cluster_name is None:
+        opts.options.cluster_name = os.environ.get('VSC_INSTITUTE_CLUSTER') or DEFAULT_CLUSTER
+
+    # determine the modules base dir: option, then derived from cluster and OS label
+    if opts.options.module_basedir is None:
+        opts.options.module_basedir = _get_modules_basedir(opts.options.cluster_name)
 
     timestamp = find_oldest_cache(opts.options.module_basedir, archs=opts.options.architecture)
     age = time.time() - timestamp
@@ -176,7 +204,14 @@ def main():
     if opts.options.create_spider_cache:
         try:
             opts.log.info("Updating the Spider cache")
-            run_spider_create(opts.options.module_basedir, archs=opts.options.architecture)
+            exitcode, msg = run_spider_create(
+                opts.options.module_basedir,
+                cluster_name=opts.options.cluster_name,
+                archs=opts.options.architecture,
+            )
+            if exitcode != 0:
+                logger.error("Spider cache update failed: %s", msg)
+                sys.exit(2)
             opts.log.info("Spider cache updated.")
         except RuntimeError as err:
             logger.exception("Failed to update Spider cache: %s", err)
