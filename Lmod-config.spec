@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.17
+Version: 1.18
 Release: 1
 License: GPL
 Group: Applications/System
@@ -41,6 +41,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Fri Oct 23 2026 Alex Domingo <alex.domingo.toro@vub.be>
+- Cache module age and ignore legacy software trees by default
 * Thu Oct 15 2026 Alex Domingo <alex.domingo.toro@vub.be>
 - Fix encoding of spider cache json file
 * Thu Oct 15 2026 Alex Domingo <alex.domingo.toro@vub.be>

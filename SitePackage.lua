@@ -50,6 +50,13 @@ local function logmsg(logTbl)
 end
 
 
+-- Cache module age per generation
+-- The visible hook evaluates each module many times per `ml av`, but the age
+-- only depends on the toolchain generation in the path.
+-- os.time() can be expensive as it makes glibc re-stat /etc/localtime on every
+-- call when TZ is unset
+local s_moduleAgeT = {}
+
 local function module_age(modT)
     -- Calculate the age of a module, relative to the current toolchain generation
     -- modT should have a entry 'fn' with the module path
@@ -72,10 +79,16 @@ local function module_age(modT)
     -- anything else is rejected
     if tcmonth == nil or tcmonth < 1 or tcmonth > 12 then return nil end
 
-    local tcstamp = os.time({year=tcyear, month=tcmonth, day=1})
+    local key = tcyear .. tcsuffix
+    local age = s_moduleAgeT[key]
+    if age == nil then
+        local tcstamp = os.time({year=tcyear, month=tcmonth, day=1})
 
-    -- 1 month is 2629743 seconds
-    return math.floor((os.time() - tcstamp) / (6 * 2629743))
+        -- 1 month is 2629743 seconds
+        age = math.floor((os.time() - tcstamp) / (6 * 2629743))
+        s_moduleAgeT[key] = age
+    end
+    return age
 end
 
 
@@ -280,6 +293,63 @@ local function visible_hook(modT)
 end
 
 
+-- The spider that `avail` uses executes every modulefile and follows the
+-- paths they add via `module use` (dynamic spidering).  legacy-software
+-- adds the CO7 tree (~1100 modulefiles).
+--
+-- Solve with spider hook that strips the legacy cluster paths from the
+-- spider's pending directory stack so they are never walked.  This does not
+-- affect users who actually load the legacy software, as real loads do not go
+-- through the spider, and once it is loaded the module sets $VUB_LEGACY_SOFTWARE
+-- activating the escape hatch.
+local LEGACY_PREFIXES = {
+    "/apps/brussel/CO7/",
+    -- "/apps/brussel/RL8/",  -- not yet used in a legacy-software module
+}
+
+local function is_legacy_path(p)
+    if type(p) ~= "string" then return false end
+    for i = 1, #LEGACY_PREFIXES do
+        local pre = LEGACY_PREFIXES[i]
+        if p:sub(1, #pre) == pre then
+            return true
+        end
+    end
+    return false
+end
+
+local function load_spider_hook()
+    if os.getenv("VUB_LEGACY_SOFTWARE") == "1" then
+        return
+    end
+    local oT = optionTbl()
+    local dirStk = oT.dirStk
+    if type(dirStk) == "table" then
+        -- Spider:findAllModules holds a local reference to this exact
+        -- array, so mutate it in place instead of reassigning.
+        local w = 1
+        for i = 1, #dirStk do
+            local p = dirStk[i]
+            if not is_legacy_path(p) then
+                dirStk[w] = p
+                w = w + 1
+            end
+        end
+        for i = w, #dirStk do
+            dirStk[i] = nil
+        end
+    end
+    local mmT = oT.mpathMapT
+    if type(mmT) == "table" then
+        for k in pairs(mmT) do
+            if is_legacy_path(k) then
+                mmT[k] = nil
+            end
+        end
+    end
+end
+
+
 local native_userInGroup = userInGroup
 
 local function userInGroupFallback(group)
@@ -382,6 +452,7 @@ end
 
 
 hook.register("load", load_hook)
+hook.register("load_spider", load_spider_hook)
 -- Needs more testing before enabling:
 -- hook.register("restore", restore_hook)
 hook.register("startup", startup_hook)
