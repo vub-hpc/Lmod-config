@@ -51,11 +51,10 @@ def _get_lmod_dir():
     return lmod_dir
 
 
-def _get_modules_basedir(cluster_name):
-    """Helper to determine the default modules base dir from the cluster and OS label"""
-    machine = 'sofia' if cluster_name == 'sofia' else 'brussel'
+def _get_modules_basedir(site_name):
+    """Helper to determine the default modules base dir from the site and OS label"""
     oslabel = os.environ.get('VSC_OS_LOCAL') or DEFAULT_OS_LOCAL
-    return f"/apps/{machine}/{oslabel}"
+    return f"/apps/{site_name}/{oslabel}"
 
 
 def _get_modsubpaths(basedir, arch):
@@ -90,7 +89,7 @@ def run_cache_create(basedir, archs=None):
     return 0, ''
 
 
-def run_spider_create(basedir, cluster_name, archs=None):
+def run_spider_create(basedir, site_name, archs=None):
     """Run the script to create the Spider cache"""
     lmod_dir = _get_lmod_dir()
 
@@ -102,7 +101,7 @@ def run_spider_create(basedir, cluster_name, archs=None):
             continue
 
         cachedir = os.path.join(basedir, arch, "cacheDir")
-        jsonfile = os.path.join(cachedir, f"{cluster_name}.json")
+        jsonfile = os.path.join(cachedir, f"{site_name}.json")
 
         cmd = [os.path.join(lmod_dir, 'spider'), '-o', 'spider-json', modsubpaths]
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -175,8 +174,8 @@ def main():
     options = {
         'create-cache': ('Create the Lmod cache', None, 'store_true', False),
         'create-spider-cache': ('Run the spider command to generate a spider cache', None, 'store_true', False),
-        'cluster-name': ('Name of the Open OnDemand cluster, used as the base name of the spider cache file',
-                         'str', 'store', None),
+        'site-name': ('Name of the site (brussel or sofia) used as the base name of the spider cache file',
+                      'str', 'store', None),
         'architecture': ('Specify the architecture to create the cache for. Default: all architectures',
                          'strlist', 'add', None),
         'freshness-threshold': ('The interval in minutes for how long we consider the cache to be fresh',
@@ -186,13 +185,14 @@ def main():
     }
     opts = SimpleOption(options)
 
-    # determine the cluster name: option, then $VSC_INSTITUTE_CLUSTER, then legacy default
-    if opts.options.cluster_name is None:
-        opts.options.cluster_name = os.environ.get('VSC_INSTITUTE_CLUSTER') or DEFAULT_CLUSTER
+    # determine the site name: option, then $VSC_INSTITUTE_CLUSTER, then legacy default
+    if opts.options.site_name is None:
+        cluster_name = os.environ.get('VSC_INSTITUTE_CLUSTER') or DEFAULT_CLUSTER
+        opts.options.site_name = 'sofia' if cluster_name == 'sofia' else 'brussel'
 
-    # determine the modules base dir: option, then derived from cluster and OS label
+    # determine the modules base dir: option, then derived from site and OS label
     if opts.options.module_basedir is None:
-        opts.options.module_basedir = _get_modules_basedir(opts.options.cluster_name)
+        opts.options.module_basedir = _get_modules_basedir(opts.options.site_name)
 
     timestamp = find_oldest_cache(opts.options.module_basedir, archs=opts.options.architecture)
     age = time.time() - timestamp
@@ -206,7 +206,7 @@ def main():
             opts.log.info("Updating the Spider cache")
             exitcode, msg = run_spider_create(
                 opts.options.module_basedir,
-                cluster_name=opts.options.cluster_name,
+                site_name=opts.options.site_name,
                 archs=opts.options.architecture,
             )
             if exitcode != 0:
