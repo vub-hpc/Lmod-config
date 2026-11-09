@@ -1,6 +1,6 @@
 Summary: Sitepackage and other config files for Lmod
 Name: Lmod-config
-Version: 1.19
+Version: 1.20
 Release: 1
 License: GPL
 Group: Applications/System
@@ -41,6 +41,8 @@ exit 0
 %{_libexecdir}/lmod/run_lmod_cache.py
 
 %changelog
+* Mon Nov 09 2026 Samuel Moors <samuel.moors@vub.be>
+- Fix legacy software trees randomly leaking into spider output
 * Mon Oct 26 2026 Alex Domingo <alex.domingo.toro@vub.be>
 - Use site name instead of cluster to store spider cache json file
 * Fri Oct 23 2026 Alex Domingo <alex.domingo.toro@vub.be>
