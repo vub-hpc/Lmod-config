@@ -273,8 +273,6 @@ local function visible_hook(modT)
 
     if modT.fullName:find("cluster/%.") then
         modT.isVisible = false
-    elseif modT.fullName:find("EESSI/") then
-        modT.isVisible = false
     elseif modT.fullName:find("JupyterHub/") then
         modT.isVisible = false
     elseif cluster ~= "sofia" then
