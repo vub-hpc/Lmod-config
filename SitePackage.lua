@@ -318,8 +318,14 @@ local function is_legacy_path(p)
     return false
 end
 
+-- Must be read here, at startup. The spider evaluates every modulefile, and
+-- while it evaluates legacy-software, its setenv of VUB_LEGACY_SOFTWARE is
+-- really applied, including when load_spider_hook runs. Checking inside the
+-- hook would then wrongly conclude that the user has legacy-software loaded.
+local legacy_software_loaded = os.getenv("VUB_LEGACY_SOFTWARE") == "1"
+
 local function load_spider_hook()
-    if os.getenv("VUB_LEGACY_SOFTWARE") == "1" then
+    if legacy_software_loaded then
         return
     end
     local oT = optionTbl()
